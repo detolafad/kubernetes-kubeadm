@@ -1,0 +1,79 @@
+# -*- mode: ruby -*-
+# vi:set ft=ruby sw=2 ts=2 sts=2:
+
+NUM_MASTER_NODE = 1
+NUM_WORKER_NODE = 2
+
+IP_NW = "192.168.56."
+MASTER_IP_START = 1
+NODE_IP_START = 2
+
+Vagrant.configure("2") do |config|
+  config.vm.box_check_update = false  # Disable checking for box updates (if necessary)
+
+  # Provision Master Node
+  (1..NUM_MASTER_NODE).each do |i|
+    config.vm.define "kubemaster#{i}" do |node|
+      node.vm.provider "docker" do |d|
+        # Set Docker image and container settings
+        d.image = "ubuntu"  # Replace with your preferred Docker image
+        d.name = "kubemaster#{i}"  # Container name
+        d.has_ssh = true  # Enable SSH (if needed)
+        d.remains_running = true  # Keep container running after vagrant halt
+
+        # Resource allocation for the container (if supported by the image)
+        d.memory = "2048"  # Set memory to 2048 MB
+        d.cpus = 2         # Set CPU count to 2
+      end
+      node.vm.hostname = "kubemaster#{i}"  # Set container's hostname
+
+      # NAT network for internet access (optional for Docker, typically not needed)
+      node.vm.network "public_network", type: "dhcp"
+
+      # Private network for Kubernetes internal communication
+      node.vm.network :private_network, ip: "#{IP_NW}#{MASTER_IP_START + i}"
+
+      # Forwarded port for SSH access (optional)
+      node.vm.network "forwarded_port", guest: 22, host: "#{2710 + i}"
+
+      # Provisioners (update paths if necessary)
+      node.vm.provision "setup-hosts", type: "shell", path: "ubuntu/vagrant/setup-hosts.sh" do |s|
+        s.args = ["enp0s8"]
+      end
+      node.vm.provision "setup-dns", type: "shell", path: "ubuntu/update-dns.sh"
+    end
+  end
+
+  # Provision Worker Nodes
+  (1..NUM_WORKER_NODE).each do |i|
+    config.vm.define "kubenode0#{i}" do |node|
+      node.vm.provider "docker" do |d|
+        # Set Docker image and container settings
+        d.image = "ubuntu"  # Replace with your preferred Docker image
+        d.name = "kubenode0#{i}"  # Container name
+        d.has_ssh = true  # Enable SSH (if needed)
+        d.remains_running = true  # Keep container running after vagrant halt
+
+        # Resource allocation for the container (if supported by the image)
+        d.memory = "2048"  # Set memory to 2048 MB
+        d.cpus = 2         # Set CPU count to 2
+      end
+      node.vm.hostname = "kubenode0#{i}"  # Set container's hostname
+
+      # NAT network for internet access (optional for Docker, typically not needed)
+      node.vm.network "public_network", type: "dhcp"
+
+      # Private network for Kubernetes internal communication
+      node.vm.network :private_network, ip: "#{IP_NW}#{NODE_IP_START + i}"
+
+      # Forwarded port for SSH access (optional)
+      node.vm.network "forwarded_port", guest: 22, host: "#{2720 + i}"
+
+      # Provisioners (update paths if necessary)
+      node.vm.provision "setup-hosts", type: "shell", path: "ubuntu/vagrant/setup-hosts.sh" do |s|
+        s.args = ["enp0s8"]
+      end
+      node.vm.provision "setup-dns", type: "shell", path: "ubuntu/update-dns.sh"
+    end
+  end
+end
